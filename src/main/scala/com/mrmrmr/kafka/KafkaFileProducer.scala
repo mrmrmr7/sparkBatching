@@ -5,11 +5,18 @@ import java.util.Properties
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerConfig, ProducerRecord}
 import org.apache.kafka.common.serialization.StringSerializer
 
-object MyCustomKafkaProducer {
-  def produce(server: String, topic: String, key: String, value: String): Unit = {
+import scala.io.Source
 
+object KafkaFileProducer {
+  def main(args: Array[String]): Unit = {
+    val filePath = "D:\\course\\spark\\untitled\\src\\main\\resources\\data_mapped_optimized.txt"
+    val bootstrapServer = "sandbox-hdp.hortonworks.com:6667"
+    val topic = "test"
+    val source = Source.fromFile(filePath)
+
+    var counter = 0
     val properties = new Properties()
-    properties.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, server)
+    properties.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServer)
     properties.put(ProducerConfig.ACKS_CONFIG, "all")
     properties.put(ProducerConfig.RETRIES_CONFIG, 5.toString)
     properties.put(ProducerConfig.BATCH_SIZE_CONFIG, 16384.toString)
@@ -20,9 +27,19 @@ object MyCustomKafkaProducer {
     properties.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, classOf[StringSerializer])
 
     val producer = new KafkaProducer[String, String](properties)
-    val record = new ProducerRecord[String, String](topic, key, value)
 
-    producer.send(record)
+//    producer.send(record)
+    for (data <- source.getLines()) {
+      counter += 1
+      if (counter % 10000 == 0){
+        println(counter)
+      }
+      val record = new ProducerRecord[String, String](topic, "0", data)
+      producer.send(record)
+      //MyCustomKafkaProducer.produce(bootstrapServer, topic, "0", data)
+    }
     producer.close()
+
+    source.close
   }
 }
