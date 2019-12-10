@@ -1,42 +1,36 @@
 package com.mrmrmr.hdfs
 
 import org.apache.spark
-import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.functions._
 import com.databricks.spark.avro._
 import com.mrmrmr.StartHere.getListOfHDFSFiles
 import com.mrmrmr.kafka.HotelWithWeatherOption
+import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.types.StructField
 
 object ExpediaReader {
-  def read(session: SparkSession, master: String, path: String) : Array[Expedia] = {
-    print(master + path)
+  def read(session: SparkSession, master: String, path: String) : (DataFrame, DataFrame) = {
     session.sqlContext
       .sparkContext
       .hadoopConfiguration
       .set("avro.mapred.ignore.inputs.without.extension", "true")
 
+    val window_srch_ci = Window
+      .partitionBy("hotel_id")
+      .orderBy("srch_ci", "srch_co")
 
-    import session.implicits._
-    val list = getListOfHDFSFiles(session, master + path)
+    val df =session.read
+      .format("com.databricks.spark.avro")
+      .load(master + path)
+      .withColumnRenamed("id", "expedia_id")
+      .select("hotel_id", "expedia_id", "srch_ci", "srch_co")
+      .withColumn("date_diff_col",
+        datediff(col("srch_ci"), lag("srch_ci", 1).over(window_srch_ci)))
+    val invalid_df = df.where((col("date_diff_col") > 1) && (col("date_diff_col") < 31))
+    val valid_df   = df.where((col("date_diff_col") < 2) || (col("date_diff_col") > 30))
 
-    while (list.hasNext) {
-      val nextPath = list.next().getPath
-      if (!nextPath.toString.endsWith("_SUCCESS")){
-        val df = session.read
-          .format("com.databricks.spark.avro")
-          .load(nextPath.toString)
-          .withColumnRenamed("id", "expedia_id")
-          .as[Expedia]
-          .collect()
-
-        for (each <- df) {
-          println(each.toString)
-        }
-      }
-    }
-
-
-    new Array[Expedia](3)
+    (valid_df, invalid_df)
   }
 }
 

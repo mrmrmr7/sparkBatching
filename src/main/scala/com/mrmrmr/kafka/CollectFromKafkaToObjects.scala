@@ -1,11 +1,11 @@
 package com.mrmrmr.kafka
 
-import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.functions.{col, from_json}
 import org.apache.spark.sql.types.{DoubleType, IntegerType, StringType, StructType}
 
 object CollectFromKafkaToObjects {
-  def collectToHotelWithWeather(session: SparkSession): Array[HotelWithWeatherOption] = {
+  def collectToHotelWithWeather(session: SparkSession): DataFrame = {
     val df = session
       .read
       .format("kafka")
@@ -19,7 +19,7 @@ object CollectFromKafkaToObjects {
     val values = df.selectExpr("CAST(value as string) as value")
     values.printSchema()
 
-    val schema = new StructType()
+    val hotelWithWeatherSchema = new StructType()
       .add("Id", StringType)
       .add("Name", StringType)
       .add("Country", StringType)
@@ -36,18 +36,10 @@ object CollectFromKafkaToObjects {
       .add("lat", DoubleType)
       .add("Precision", IntegerType)
 
-    val json_values = values
+    values
       .drop(col("key"))
-      .select(from_json(col("value"), schema).as("data"))
+      .select(from_json(col("value"), hotelWithWeatherSchema).as("data"))
       .select("data.*")
-      .as[HotelWithWeatherOption]
-      .collect()
-
-    for (each <- json_values) {
-      println(each)
-    }
-
-    json_values
   }
 }
 

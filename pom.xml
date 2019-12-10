@@ -47,7 +47,6 @@
             <artifactId>spark-avro_2.11</artifactId>
             <version>2.4.3</version>
         </dependency>
-
     </dependencies>
 
     <build>
