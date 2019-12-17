@@ -8,15 +8,16 @@ import org.apache.spark.sql.functions._
 
 object StartHere {
   def main(args: Array[String]): Unit = {
-    val hdfsMaster = "hdfs://sandbox-hdp.hortonworks.com:8020"
-    val hdfsPath = "/user/spark/expedia/"
-    val valid_store_path = "/user/spark/expedia_valid/"
-
     val session = SparkSession
       .builder
       .master("local[*]")
       .appName("KafkaReader")
       .getOrCreate()
+
+    val hdfsMaster = session.sparkContext.getConf.get("spark.hdfs.master")
+    val hdfsPath = session.sparkContext.getConf.get("spark.hdfs.expedia.path")
+    val valid_store_path = session.sparkContext.getConf.get("spark.hdfs.store.valid.path")
+
 
     val hadoopConfig: Configuration = session.sparkContext.hadoopConfiguration
     hadoopConfig.set("fs.hdfs.impl", classOf[org.apache.hadoop.hdfs.DistributedFileSystem].getName)
@@ -47,7 +48,7 @@ object StartHere {
       .groupBy("City")
       .agg(count("*"))
     group_by_city.show(numRows = group_by_city.count().toInt, truncate = false)
-    
+
     ExpediaWriter.writeToHdfs(valid_df, hdfsMaster + valid_store_path)
   }
 }
